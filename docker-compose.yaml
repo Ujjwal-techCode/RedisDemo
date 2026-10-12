@@ -10,6 +10,7 @@ services:
   spring-app:
     container_name: spring_app_container
     build: . # Points to the Dockerfile of your Spring Boot app
+    image: redis-demo-spring-boot-app
     ports:
       - "9091:8081"
     depends_on:

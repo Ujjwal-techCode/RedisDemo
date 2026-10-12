@@ -1,0 +1,59 @@
+name : Spring Boot build and deploy on AWS
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  IMAGE_NAME: redis-demo-spring-boot-app
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setting Up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: maven
+      - run: java --version
+
+      - name: Build Jar
+        run: mvn clean package -DskipTests
+
+      - name: Building Docker Image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest .
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push Image to DockerHub
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          #password: ${{ secrets.EC2_PASSWORD }}
+          #port: ${{ secrets.PORT }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            # docker stop spring_app_container || true
+            # docker stop redis_container || true
+            # docker rm spring_app_container || true
+            # docker rm redis_container || true
+            # docker run -d --name  redisDemo --restart unless-stopped -p 9091:8081 ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            docker compose down
+            docker compose up -d
+            docker image prune -f
